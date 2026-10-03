@@ -1,0 +1,101 @@
+name: Verify and package CPA plugin
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test -race ./... && go vet ./...
+      - name: Check store source format
+        run: |
+          python3 - <<'PY'
+          import json
+          p = json.load(open('registry.json'))
+          assert p['schema_version'] == 1
+          assert len(p['plugins']) == 1
+          plugin = p['plugins'][0]
+          assert plugin['id'] == 'pi-usage-cpa'
+          assert plugin['install']['type'] == 'github-release'
+          assert plugin['repository'] == 'https://github.com/wayner6/pi-usage-cpa'
+          PY
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build store archive
+        env:
+          TAG: ${{ github.ref_name }}
+          ARCH: ${{ matrix.arch }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          version=0.0.0-ci
+          if [[ "$REF_TYPE" == tag ]]; then
+            [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'invalid release tag' >&2; exit 1; }
+            version="${TAG#v}"
+          fi
+          mkdir -p dist
+          CGO_ENABLED=1 go build -trimpath -buildmode=c-shared -ldflags "-X main.pluginVersion=$version" -o dist/pi-usage-cpa.so .
+          (cd dist && zip "pi-usage-cpa_${version}_linux_${ARCH}.zip" pi-usage-cpa.so)
+          test "$(unzip -Z1 "dist/pi-usage-cpa_${version}_linux_${ARCH}.zip")" = pi-usage-cpa.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: store-linux-${{ matrix.arch }}
+          path: dist/pi-usage-cpa_*.zip
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: store-linux-*
+          merge-multiple: true
+          path: dist
+      - name: Check archives and publish tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          version="${TAG#v}"
+          cd dist
+          for arch in amd64 arm64; do
+            asset="pi-usage-cpa_${version}_linux_${arch}.zip"
+            test -f "$asset"
+            test "$(unzip -Z1 "$asset")" = pi-usage-cpa.so
+          done
+          sha256sum pi-usage-cpa_*.zip > checksums.txt
+          sha256sum -c checksums.txt
+          gh release create "$TAG" pi-usage-cpa_*.zip checksums.txt --verify-tag --title "pi-usage-cpa $TAG" --generate-notes

@@ -93,7 +93,13 @@ func fromEnvironment() (*bridge, error) {
 			return nil, errors.New("invalid group mapping JSON")
 		}
 	}
-	return newBridge(origin, os.Getenv("PI_USAGE_CPA_MANAGEMENT_KEY"), families)
+	key := os.Getenv("PI_USAGE_CPA_MANAGEMENT_KEY")
+	if key == "" {
+		// CPA v8 can already hold the plaintext management password in its process
+		// environment. Reuse it without writing a second copy to plugin config.
+		key = os.Getenv("MANAGEMENT_PASSWORD")
+	}
+	return newBridge(origin, key, families)
 }
 func (b *bridge) management(ctx context.Context, path string, payload any, out any) error {
 	var body io.Reader
