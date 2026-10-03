@@ -2,7 +2,7 @@
 
 运行在 [CLIProxyAPI（CPA）](https://github.com/router-for-me/CLIProxyAPI) 服务端的只读插件，为 [Pi Usage](https://github.com/wayner6/pi-usage) 提供逐账户的真实额度窗口。服务端当前源码覆盖 Antigravity、Claude、Codex、Kimi、xAI、Devin、Meta；具体值只来自各服务商的额度接口，不用 CPA 请求统计推算。
 
-> **版本状态：** 已发布的 **v0.2.1** 缺少必需注册元数据，无法在 CPA v8.0.8 注册；修复目前仅在源码中，尚未发布新版。客户端需要 Pi Usage **GitHub 0.6.0**，npm latest `0.3.0` 不支持本插件。宿主注册测试使用 CPA v8.0.8 源码和本地构建的 `.so`；尚未完成生产 Docker Compose 和真实账户额度端到端验收。
+> **版本配套：** **v0.2.3** 包含 CPA v8 注册修复及 Antigravity 新组名映射；v0.2.2 仅包含注册修复。客户端需要 Pi Usage **GitHub 0.6.0**，npm latest `0.3.0` 不支持本插件。宿主注册测试使用 CPA v8.0.8 源码和本地构建的 `.so`；生产环境已确认 v0.2.2 注册生效，完整真实额度端到端验收仍未完成。
 
 ## 能做什么
 
@@ -37,11 +37,11 @@ Claude Opus · 5h 84% · 7d unavailable
 - CPA 使用配置中的普通 `api-keys` 鉴权。本插件从**本机**管理接口验证这些 key；自定义插件鉴权的 key 未支持。
 - CPA 进程已有 `MANAGEMENT_PASSWORD` 环境变量，或额外提供 `PI_USAGE_CPA_MANAGEMENT_KEY`（CPA Management Key 明文）。插件优先使用专用变量，缺省时复用进程已有的 `MANAGEMENT_PASSWORD`；若只有 CPA 配置里的哈希管理密钥，两者都没设置，则无法自动取得明文，必须额外在服务端安全注入。**不要**为了此插件新设 `MANAGEMENT_PASSWORD` 而意外开启 CPA 远程管理；这种情况使用专用变量。
 - CPA 进程本身能访问 `http://127.0.0.1:8317` 管理接口，或用 `PI_USAGE_CPA_MANAGEMENT_ORIGIN` 指向进程网络空间内的另一数字 loopback HTTP origin。容器里的 `127.0.0.1` **不是宿主机**。不接受任意管理 URL、公网地址或客户端传入的上游 URL。
-- 上游真实组名若与默认精确映射 `Gemini`、`Claude / GPT`、`Claude/GPT` 不同，管理员须先在服务器本地核对响应后设置 `PI_USAGE_CPA_GROUP_MAP`（JSON：上游组名 → `gemini` 或 `claude-gpt`）。本插件不会猜组名；无需在聊天提供响应。
+- 当前源码按精确组名映射：`Gemini`、`Gemini Models` → `gemini`；`Claude / GPT`、`Claude/GPT`、`Claude and GPT models` → `claude-gpt`。新增两个组名需要 v0.2.3 或更新版本。其他组名须先在服务器本地确认归属，再通过 `PI_USAGE_CPA_GROUP_MAP`（JSON：上游组名 → 模型族）配置；未知名称不会按关键词或窗口猜测归属，无需分享原始响应。
 
 ## 安装
 
-Web 添加插件源和安装插件**不会自动注入环境变量**。先满足上述前提，再安装包含注册修复的新 Release；当前 v0.2.1 无法在 CPA v8.0.8 注册。
+Web 添加插件源和安装插件**不会自动注入环境变量**。先满足上述前提，再安装 v0.2.3 或更新版本；v0.2.1 无法在 CPA v8.0.8 注册。
 
 ### 1. 准备服务端管理凭据
 
@@ -86,7 +86,7 @@ docker compose up -d --no-deps --force-recreate cpa
 
 3. 保留已有插件源，保存配置，并确认 **启用插件系统**已开启。
 4. 打开左侧 **插件商店**，刷新列表，搜索 `Pi Usage`。
-5. 找到 **Pi Usage · CPA Quotas**，确认是包含注册修复的新版本，点击安装，再按界面提示启用或重载。新版发布前不要用 v0.2.1 验收 CPA v8.0.8。
+5. 找到 **Pi Usage · CPA Quotas**，确认版本为 **v0.2.3** 或更新版本，点击安装，再按界面提示启用或重载。
 
 已有 `pi-bridge` 请保留到新插件验收完成。插件配置弹窗显示“没有声明可视化配置字段”是正常的，管理凭据来自服务端环境。
 

@@ -37,6 +37,45 @@ func TestSummary(t *testing.T) {
 		t.Fatal("fallback mislabeled")
 	}
 }
+func TestSummaryDefaultGroupNames(t *testing.T) {
+	t.Setenv("PI_USAGE_CPA_MANAGEMENT_ORIGIN", "http://127.0.0.1:1")
+	t.Setenv("PI_USAGE_CPA_MANAGEMENT_KEY", "synthetic-admin")
+	t.Setenv("PI_USAGE_CPA_GROUP_MAP", "")
+	b, err := fromEnvironment()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Synthetic quota values with the exact observed upstream group names.
+	raw := `{"groups":[{"displayName":"Gemini Models","buckets":[{"window":"weekly","remainingFraction":0.31},{"window":"5h","remainingFraction":0.42}]},{"displayName":"Claude and GPT models","buckets":[{"window":"weekly","remainingFraction":0.17},{"window":"5h","remainingFraction":0.23}]}]}`
+	groups, err := parseSummary([]byte(raw), b.families)
+	if err != nil || len(groups) != 4 || len(missing(groups)) != 0 {
+		t.Fatalf("expected four explicit windows, got %+v, error %v", groups, err)
+	}
+	want := map[string]float64{"gemini-7d": 0.31, "gemini-5h": 0.42, "claude-gpt-7d": 0.17, "claude-gpt-5h": 0.23}
+	for _, g := range groups {
+		remaining, ok := want[g.ID]
+		if !ok || g.ID != g.ModelGroup+"-"+g.Window || g.Remaining != remaining || g.Source != "summary" {
+			t.Fatalf("incorrect family/window/quota: %+v", g)
+		}
+		delete(want, g.ID)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing windows: %v", want)
+	}
+	for name, family := range map[string]string{"Gemini": "gemini", "Claude / GPT": "claude-gpt", "Claude/GPT": "claude-gpt"} {
+		if b.families[name] != family {
+			t.Fatalf("existing mapping changed: %q", name)
+		}
+	}
+	for _, name := range []string{"Unknown", "Gemini Models preview", "claude and gpt models"} {
+		unknown := strings.ReplaceAll(raw, "Gemini Models", name)
+		unknown = strings.ReplaceAll(unknown, "Claude and GPT models", name)
+		if groups, err := parseSummary([]byte(unknown), b.families); err == nil || len(groups) != 0 {
+			t.Fatalf("unknown group %q must not be guessed: %+v", name, groups)
+		}
+	}
+}
+
 func TestService(t *testing.T) {
 	for _, upstreamStatus := range []int{200, 403, 429} {
 		t.Run(fmt.Sprint(upstreamStatus), func(t *testing.T) {

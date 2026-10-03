@@ -90,7 +90,13 @@ func fromEnvironment() (*bridge, error) {
 	if origin == "" {
 		origin = "http://127.0.0.1:8317"
 	}
-	families := map[string]string{"Gemini": "gemini", "Claude / GPT": "claude-gpt", "Claude/GPT": "claude-gpt"}
+	families := map[string]string{
+		"Gemini":                "gemini",
+		"Gemini Models":         "gemini",
+		"Claude / GPT":          "claude-gpt",
+		"Claude/GPT":            "claude-gpt",
+		"Claude and GPT models": "claude-gpt",
+	}
 	if raw := os.Getenv("PI_USAGE_CPA_GROUP_MAP"); raw != "" {
 		if json.Unmarshal([]byte(raw), &families) != nil {
 			return nil, errors.New("invalid group mapping JSON")
