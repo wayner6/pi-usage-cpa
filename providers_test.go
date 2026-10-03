@@ -52,6 +52,37 @@ func TestProviderParsers(t *testing.T) {
 		t.Fatal("invented xAI quota from balance")
 	}
 }
+func TestKimiTimeUnitEnums(t *testing.T) {
+	cases := []struct {
+		unit     string
+		duration int
+		window   string
+	}{
+		{"TIME_UNIT_MINUTE", 300, "5h"},
+		{" time_unit_minutes ", 300, "5h"},
+		{"TIME_UNIT_HOUR", 5, "5h"},
+		{"TIME_UNIT_DAY", 7, "7d"},
+		{"TIME_UNIT_DAYS", 1, "daily"},
+		{"TIME_UNIT_WEEK", 1, "7d"},
+		{"minute", 300, "5h"},
+		{"TIME_UNIT_MINUTE", 60, ""},
+		{"TIME_UNIT_UNSPECIFIED", 300, ""},
+		{"", 300, ""},
+	}
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%s/%d", tc.unit, tc.duration), func(t *testing.T) {
+			raw := fmt.Sprintf(`{"limits":[{"window":{"duration":%d,"timeUnit":%q},"detail":{"used":"2","limit":"10","resetTime":"2030-01-01T05:00:00Z"}}]}`, tc.duration, tc.unit)
+			gs := parseKimi([]byte(raw))
+			if len(gs) != 1 || gs[0].Window != tc.window || gs[0].Remaining != 0.8 {
+				t.Fatalf("unexpected Kimi quota: %+v", gs)
+			}
+			if tc.window == "" && gs[0].Label != "Quota (window unknown)" {
+				t.Fatalf("guessed window label: %+v", gs[0])
+			}
+		})
+	}
+}
+
 func TestSevenAccountsAndCredentialIsolation(t *testing.T) {
 	fixtures := map[string]string{
 		"claude":      `{"five_hour":{"utilization":20}}`,

@@ -160,7 +160,7 @@ func kimiPeriod(entry map[string]any) (string, string) {
 	d, ok := number(field(w, "duration"))
 	unit, _ := field(w, "timeUnit").(string)
 	if ok {
-		switch strings.ToLower(unit) {
+		switch strings.TrimPrefix(strings.ToLower(strings.TrimSpace(unit)), "time_unit_") {
 		case "hour", "hours":
 			if d == 5 {
 				return "5h", "5h"
