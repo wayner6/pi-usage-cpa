@@ -90,7 +90,17 @@ func dispatch(method string, raw []byte) []byte {
 		if err != nil {
 			return []byte(`{"ok":false,"error":{"code":"configuration","message":"server-only loopback management configuration required"}}`)
 		}
-		return envelope(map[string]any{"schema_version": 1, "metadata": map[string]any{"Name": "pi-usage-cpa", "Version": pluginVersion, "Author": "pi-usage-cpa contributors", "ConfigFields": []any{}}, "capabilities": map[string]any{"management_api": true}})
+		return envelope(map[string]any{
+			"schema_version": 1,
+			"metadata": map[string]any{
+				"Name":             "pi-usage-cpa",
+				"Version":          pluginVersion,
+				"Author":           "pi-usage-cpa contributors",
+				"GitHubRepository": "https://github.com/wayner6/pi-usage-cpa",
+				"ConfigFields":     []any{},
+			},
+			"capabilities": map[string]any{"management_api": true},
+		})
 	case "management.register":
 		return envelope(map[string]any{"resources": []any{map[string]string{"Path": "/usage"}, map[string]string{"Path": "/capabilities"}, map[string]string{"Path": "/well-known"}}})
 	case "management.handle":

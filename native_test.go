@@ -15,13 +15,20 @@ func TestRegistration(t *testing.T) {
 		var e struct {
 			OK     bool `json:"ok"`
 			Result struct {
-				Schema       int `json:"schema_version"`
-				Metadata     struct{ Name, Version string }
+				Schema   int `json:"schema_version"`
+				Metadata struct {
+					Name, Version, Author, GitHubRepository string
+					ConfigFields                            []any
+				}
 				Capabilities map[string]bool
 			}
 		}
-		if json.Unmarshal(dispatch(method, nil), &e) != nil || !e.OK || e.Result.Schema != 1 || e.Result.Metadata.Name != "pi-usage-cpa" || e.Result.Metadata.Version != pluginVersion || !e.Result.Capabilities["management_api"] {
-			t.Fatal("invalid ABI registration")
+		if err := json.Unmarshal(dispatch(method, nil), &e); err != nil {
+			t.Fatal(err)
+		}
+		meta := e.Result.Metadata
+		if !e.OK || e.Result.Schema != 1 || meta.Name != "pi-usage-cpa" || meta.Version != pluginVersion || strings.TrimSpace(meta.Version) == "" || strings.TrimSpace(meta.Author) == "" || meta.GitHubRepository != "https://github.com/wayner6/pi-usage-cpa" || meta.ConfigFields == nil || !e.Result.Capabilities["management_api"] {
+			t.Fatalf("%s: incomplete ABI registration: %+v", method, e)
 		}
 	}
 	var e struct {

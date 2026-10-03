@@ -31,8 +31,19 @@ jobs:
           assert plugin['repository'] == 'https://github.com/wayner6/pi-usage-cpa'
           PY
 
-  build:
+  host-integration:
     needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Register native plugin in CPA v8.0.8 host
+        run: bash integration/test-cpa-v8.sh
+
+  build:
+    needs: [test, host-integration]
     strategy:
       fail-fast: false
       matrix:
