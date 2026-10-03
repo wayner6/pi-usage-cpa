@@ -1,6 +1,6 @@
 # 发布与维护说明（维护者）
 
-普通用户安装、验收和回滚请直接阅读 [README.md](README.md)。本文件不要求普通用户编译插件；发布资产以 GitHub Releases 为准。
+普通用户安装、验收和回滚请直接阅读 [README.md](README.md)。本文件不要求普通用户编译插件；发布资产以 GitHub Releases 为准。v0.1.0 仅支持 Antigravity；v0.2.0 配合 Pi Usage GitHub 0.6.0 提供七类额度，仍待真实 CPA v8 验证。
 
 ## CPA v8 商店约定
 
@@ -22,7 +22,7 @@ ZIP 根目录只有 `pi-usage-cpa.so`，校验文件采用 sha256sum 格式；CP
 - CPA 插件进程必须有服务端可用的明文管理凭据。`PI_USAGE_CPA_MANAGEMENT_KEY` 优先；没有时复用已有 `MANAGEMENT_PASSWORD`。管理入口必须在容器进程的数字 loopback 上；普通 Pi API Key 无法代替管理密钥。只依赖配置中的 bcrypt 哈希时无法自动反推明文。
 - 宿主的请求日志可能与插件输出脱敏无关；确认管理请求及上游响应不被额外记录。
 - 真实 `groups[].displayName` 与 `buckets[].window` 需要在服务器本地核对，缺失时用精确 `PI_USAGE_CPA_GROUP_MAP` 映射；没有窗口的降级数据不得冒充 5h/7d。
-- Pi Usage GitHub 0.5.0 已支持新路由且不回退旧插件；npm 0.3.0 不认识新路由。安装时须明确客户端来源和版本。
+- Pi Usage GitHub 0.6.0 配合服务端 v0.2.0 解析七类额度且不回退旧插件；旧版 GitHub 0.5.0 只解析 Antigravity，npm 0.3.0 不认识新路由。安装时须明确客户端来源和版本。
 
 ## 手动构建（仅调试）
 

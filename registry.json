@@ -3,8 +3,8 @@
   "plugins": [
     {
       "id": "pi-usage-cpa",
-      "name": "Pi Usage · Antigravity Quota",
-      "description": "Read-only per-account Antigravity 5-hour and weekly quota windows for Pi Usage.",
+      "name": "Pi Usage · CPA Quotas",
+      "description": "Read-only per-account quota windows for Pi Usage: Antigravity, Claude, Codex, Kimi, xAI, Devin and Meta (requires the matching client release).",
       "author": "wayner6",
       "repository": "https://github.com/wayner6/pi-usage-cpa",
       "homepage": "https://github.com/wayner6/pi-usage-cpa",

@@ -55,6 +55,9 @@ type account struct {
 	Unavailable bool     `json:"unavailable,omitempty"`
 }
 type authFile struct {
+	Name         string                     `json:"name"`
+	RuntimeOnly  bool                       `json:"runtime_only"`
+	Domain       string                     `json:"domain"`
 	Index        string                     `json:"auth_index"`
 	Provider     string                     `json:"provider"`
 	Type         string                     `json:"type"`
@@ -316,10 +319,11 @@ func (b *bridge) load(ctx context.Context) ([]account, error) {
 	}
 	accounts := []account{}
 	for _, file := range result.Files {
-		if file.Provider != "antigravity" && file.Type != "antigravity" {
+		provider := supportedProvider(file)
+		if provider == "" {
 			continue
 		}
-		a := account{Provider: "antigravity", ID: b.pseudonym(file.Index), Label: fmt.Sprintf("Antigravity %d", len(accounts)+1), Groups: []group{}, Disabled: file.Disabled, Unavailable: file.Unavailable}
+		a := account{Provider: provider, ID: b.pseudonym(file.Index), Label: fmt.Sprintf("%s %d", provider, len(accounts)+1), Groups: []group{}, Disabled: file.Disabled, Unavailable: file.Unavailable}
 		if file.Project == "" {
 			file.Project = file.ProjectCamel
 		}
@@ -329,7 +333,17 @@ func (b *bridge) load(ctx context.Context) ([]account, error) {
 		if file.Project == "" {
 			file.Project = text(file.Attributes, "project_id", "projectId", "gemini_virtual_project")
 		}
-		if !file.Disabled && !file.Unavailable {
+		if !file.Disabled && !file.Unavailable && provider != "antigravity" {
+			if file.Index == "" {
+				a.Error = "credential selector missing"
+			} else {
+				var err error
+				a.Groups, err = b.providerQuota(ctx, file, provider)
+				if err != nil {
+					a.Error = "quota unavailable"
+				}
+			}
+		} else if !file.Disabled && !file.Unavailable {
 			if file.Index == "" || file.Project == "" {
 				a.Error = "credential project or selector missing"
 			} else {
@@ -352,7 +366,9 @@ func (b *bridge) load(ctx context.Context) ([]account, error) {
 		if a.Groups == nil {
 			a.Groups = []group{}
 		}
-		a.Missing = missing(a.Groups)
+		if provider == "antigravity" {
+			a.Missing = missing(a.Groups)
+		}
 		accounts = append(accounts, a)
 	}
 	return accounts, nil
@@ -407,7 +423,7 @@ func (b *bridge) handle(method, path string, headers http.Header, query url.Valu
 	case "/usage":
 		return b.usage(ctx, query.Get("refresh") == "1")
 	case "/capabilities", "/well-known":
-		return []byte(`{"schemaVersion":1,"pluginId":"pi-usage-cpa","usage":"/v0/resource/plugins/pi-usage-cpa/usage","modelGroups":["gemini","claude-gpt"],"windows":["5h","7d"],"routingAccount":"unknown"}`), 200
+		return []byte(`{"schemaVersion":1,"pluginId":"pi-usage-cpa","usage":"/v0/resource/plugins/pi-usage-cpa/usage","modelGroups":["gemini","claude-gpt","claude","codex","kimi","xai","devin","meta"],"windows":["5h","7d","daily","monthly","unknown"],"routingAccount":"unknown"}`), 200
 	default:
 		return []byte(`{"error":"not found"}`), 404
 	}
