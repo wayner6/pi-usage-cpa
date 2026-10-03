@@ -2,7 +2,7 @@
 
 运行在 [CLIProxyAPI（CPA）](https://github.com/router-for-me/CLIProxyAPI) 服务端的只读插件，为 [Pi Usage](https://github.com/wayner6/pi-usage) 提供逐账户的真实额度窗口。服务端当前源码覆盖 Antigravity、Claude、Codex、Kimi、xAI、Devin、Meta；具体值只来自各服务商的额度接口，不用 CPA 请求统计推算。
 
-> **版本配套：** 本插件 GitHub Release **v0.2.0** 配合 Pi Usage **GitHub 0.6.0** 才支持下述七类；旧版服务端 v0.1.0 和客户端 0.5.0 仅支持 Antigravity。npm `@wayner6/pi-usage` 的 latest 仍为 0.3.0，不支持本插件。测试均使用模拟数据；尚未在真实 CPA v8 Docker Compose 和生产账户上完成端到端验收。
+> **版本配套：** 本插件 GitHub Release **v0.2.1** 配合 Pi Usage **GitHub 0.6.0** 才支持下述七类；旧版服务端 v0.1.0 和客户端 0.5.0 仅支持 Antigravity。npm `@wayner6/pi-usage` 的 latest 仍为 0.3.0，不支持本插件。测试均使用模拟数据；尚未在真实 CPA v8 Docker Compose 和生产账户上完成端到端验收。
 
 ## 能做什么
 
@@ -10,7 +10,7 @@
 - Claude/Codex/Kimi/xAI/Devin/Meta 各自使用固定额度查询与模型匹配：Claude 的 5h/7d 和模型专属周额度、Codex 主额度明确时长的窗口、Kimi 显式周期与月额度、xAI 免费档可查询的账单额度、Devin 日/周额度、Meta 明确窗口与周额度。缺失、未知窗口不冒称 5h/7d。xAI 付费档若只有聊天健康探测而无可查额度，显示不可用；不额外发送聊天请求。
 - 汇总请求失败时可降级为 `fetchAvailableModels` 的**未标窗口**额度；不会把降级数据写成 5h/7d。多个可用账户而 CPA 路由选择未知时，不把某个账户的额度冒充整个代理池。
 - 只读 GET `/usage`、`/capabilities`、`/well-known`；使用普通 CPA API Key 鉴权。120 秒额度缓存、强制刷新限流、超时、脱敏。Pi 不需要管理密钥或上游 token。
-- 插件 ID 为 `pi-usage-cpa`，与旧 `pi-bridge` 路由不同，可以并存。Pi Usage GitHub 0.6.0 **仅访问新路由**，不会回退旧插件；配合本插件 v0.2.0 展示七类额度。
+- 插件 ID 为 `pi-usage-cpa`，与旧 `pi-bridge` 路由不同，可以并存。Pi Usage GitHub 0.6.0 **仅访问新路由**，不会回退旧插件；配合本插件 v0.2.1 展示七类额度。
 
 | 服务商 | 读取内容（仅在上游实际返回时） | 不显示为额度的情况 |
 |---|---|---|
@@ -39,36 +39,26 @@ Claude Opus · 5h 84% · 7d unavailable
 - CPA 进程本身能访问 `http://127.0.0.1:8317` 管理接口，或用 `PI_USAGE_CPA_MANAGEMENT_ORIGIN` 指向进程网络空间内的另一数字 loopback HTTP origin。容器里的 `127.0.0.1` **不是宿主机**。不接受任意管理 URL、公网地址或客户端传入的上游 URL。
 - 上游真实组名若与默认精确映射 `Gemini`、`Claude / GPT`、`Claude/GPT` 不同，管理员须先在服务器本地核对响应后设置 `PI_USAGE_CPA_GROUP_MAP`（JSON：上游组名 → `gemini` 或 `claude-gpt`）。本插件不会猜组名；无需在聊天提供响应。
 
-## 最省事的安装方式：CPA 插件商店
+## 安装
 
-安装插件本身不需要在服务器安装 Go，也不需要手工放 `.so`。目前通过下方自有插件源安装；尚未获 CPA 官方商店收录。**确认商店实际安装版本为 v0.2.0**；v0.1.0 只支持 Antigravity。
+通过 **CPA Web 管理界面**安装。本插件尚未收录到官方商店，需要先添加第三方插件源。
 
-1. 确认 CPA 已启用插件功能，插件目录可写且会在容器重建后保留；备份 CPA 配置，保留已有 `pi-bridge`。
-2. 在 CPA 管理界面 **配置管理 → 高级 → 第三方插件源** 中加入（该项由 CPA 管理界面版本提供，也可在 `plugins.store-sources` 中配置）：
+1. 打开 **配置面板**，搜索 `store-sources`，找到 **第三方插件源**。
+2. 点击 **添加**，在新的一行填写：
 
    ```text
    https://raw.githubusercontent.com/wayner6/pi-usage-cpa/main/registry.json
    ```
 
-   官方商店默认源始终保留。本项目**未获官方收录**，需添加一次第三方源；仅把源码仓库公开不会自动出现在官方列表。
-3. **点击安装前**确认 CPA 进程已有正确的 `MANAGEMENT_PASSWORD`、管理接口在容器本机可达；满足条件则**无需新增密钥配置**。否则先按下节为 CPA 进程注入专用变量。插件注册缺少服务端密钥会失败，Pi 的普通 API Key 不能替代管理密钥。
-4. 在 **插件 → 商店** 中找到 `Pi Usage · CPA Quotas`，确认 v0.2.0、容器平台后点击安装。CPA v8 商店会下载安装包、核对 SHA-256、写入启用配置；遇到重载/重启提示按 CPA 管理界面操作。不要覆盖或卸载旧 `pi-bridge`。
-5. 使用 Pi Usage **GitHub 0.6.0**（`pi install github:wayner6/pi-usage`；pi-web 用 `git:https://github.com/wayner6/pi-usage`）验收七类服务商。npm `0.3.0` 不具备该能力，暂不要用 `npm:@wayner6/pi-usage` 验收。
+3. 保留已有插件源，保存配置，并确认 **启用插件系统**已开启。
+4. 打开左侧 **插件商店**，刷新列表，搜索 `Pi Usage`。
+5. 找到 **Pi Usage · CPA Quotas**，确认版本 **v0.2.1**，点击安装，再按界面提示启用或重载。
 
-### Docker Compose：只有缺少环境变量时才改动
+安装前，CPA 进程须已有 `MANAGEMENT_PASSWORD` 或 `PI_USAGE_CPA_MANAGEMENT_KEY`，且本机管理接口可达；缺少时需在服务端配置，Web 安装不会自动注入环境变量。安装包支持 Linux amd64/arm64 的 glibc 环境。已有 `pi-bridge` 请保留到新插件验收完成。
 
-如果已有 `MANAGEMENT_PASSWORD` 且管理端口是容器内默认端口，通常不需要为**本插件**编辑 Compose。否则，把**已存在的服务端管理明文密钥**通过你的密钥管理/受保护环境文件传入 CPA 服务。下面仅展示变量引用，不包含密钥值，也不是完整 Compose 文件：
+### 配套客户端
 
-```yaml
-services:
-  cpa: # 换成实际服务名，只把 environment 字段合并进原服务
-    environment:
-      PI_USAGE_CPA_MANAGEMENT_KEY: ${PI_USAGE_CPA_MANAGEMENT_KEY:?set_in_a_private_server_env}
-      # 仅当 CPA 容器内管理监听端口并非 8317 时设置：
-      # PI_USAGE_CPA_MANAGEMENT_ORIGIN: http://127.0.0.1:实际端口
-```
-
-不要把明文写在提交到 Git 的 Compose 或 `.env` 中，不要把 Compose 的完整展开结果、密钥或原始额度响应发给任何人。`PI_USAGE_CPA_MANAGEMENT_KEY` 只属于 CPA 容器，不属于 Pi 客户端。Compose 新增环境变量通常需要安排一次**容器重建**（影响在途请求）；商店点击安装无法凭空把新环境注入已运行容器。也可采用现有安全密钥注入方式代替 `${...}`。不要把管理接口暴露到公网。
+使用 Pi Usage **GitHub 0.6.0**；npm latest `0.3.0` 不支持本插件。客户端安装见 [Pi Usage README](https://github.com/wayner6/pi-usage#安装)。
 
 ### 验收与回滚
 
@@ -76,18 +66,6 @@ services:
 - 检查 `accounts[].provider`、`groups[]` 的 `modelGroup`、`window`、`source`，以及 Antigravity 的 `missingWindows`。只有明确的窗口字段才可以标 5h/7d；未知窗口与 `fallback` 不可冒称双窗口。请只报告校验结果，不粘贴账户标识、请求头或额度原始响应。
 - HTTP 401：检查普通 key 是否属于 CPA `api-keys`，以及服务端本机管理鉴权是否正常；错误时 fail closed。404：检查新插件是否正确启用。403/429：在服务器本地排查 project、上游状态和频率，不通过重置时间推断窗口。
 - 回滚只需在 CPA 插件管理界面**禁用新增 `pi-usage-cpa`**，按提示重载；保留旧插件。Pi Usage GitHub 0.6.0 **不会回退旧插件**，禁用后状态栏可能显示 `Bridge Not Found`；如需旧额度展示须另外切回旧客户端。插件不改账户文件或模型调度。
-
-## 自行构建（开发者可选）
-
-Go 1.26、C 编译器、与目标 CPA 容器兼容的构建环境：
-
-```sh
-go test -race ./...
-go vet ./...
-CGO_ENABLED=1 go build -buildmode=c-shared -o pi-usage-cpa.so .
-```
-
-标签 `vX.Y.Z` 的 GitHub Actions 会为 Linux amd64/arm64 构建 `pi-usage-cpa_X.Y.Z_linux_<arch>.zip` 与 `checksums.txt`；ZIP 根目录为 `pi-usage-cpa.so`。`registry.json` 使用 CPA 商店 `github-release` 安装类型。实际发布以 GitHub Releases 页面列出的标签、资产和校验文件为准；不要使用仅有源码、缺少安装包的提交。
 
 ## 安全与许可
 
