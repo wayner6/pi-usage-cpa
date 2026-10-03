@@ -71,7 +71,7 @@ type authFile struct {
 
 func newBridge(origin, key string, families map[string]string) (*bridge, error) {
 	u, err := url.Parse(origin)
-	if err != nil || u.Scheme != "http" || (u.Hostname() != "127.0.0.1" && u.Hostname() != "[::1]" && u.Hostname() != "::1") || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") || key == "" {
+	if err != nil || u.Scheme != "http" || (u.Hostname() != "127.0.0.1" && u.Hostname() != "::1") || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") || key == "" {
 		return nil, errors.New("loopback management origin and server key required")
 	}
 	for _, family := range families {
@@ -167,9 +167,14 @@ func (b *bridge) authorized(ctx context.Context, header http.Header) bool {
 	}
 	return match == 1
 }
-func (b *bridge) upstream(ctx context.Context, file authFile, endpoint string) ([]byte, int, error) {
-	data, _ := json.Marshal(map[string]string{"project": file.Project})
-	payload := map[string]any{"authIndex": file.Index, "method": "POST", "url": endpoint, "header": map[string]string{"Authorization": "Bearer $TOKEN$", "Content-Type": "application/json", "User-Agent": "antigravity/cli/1.20.0 (pi-usage-cpa; os_type=linux; arch=x64)"}, "data": string(data)}
+
+// All provider quota requests share the same management bridge and status handling.
+// Callers supply fixed upstream endpoints; downstream requests cannot choose them.
+func (b *bridge) quotaCall(ctx context.Context, file authFile, endpoint, method string, headers map[string]string, data string) ([]byte, int, error) {
+	payload := map[string]any{"authIndex": file.Index, "method": method, "url": endpoint, "header": headers}
+	if data != "" {
+		payload["data"] = data
+	}
 	var result struct {
 		Status int    `json:"status_code"`
 		Body   string `json:"body"`
@@ -181,6 +186,11 @@ func (b *bridge) upstream(ctx context.Context, file authFile, endpoint string) (
 		return nil, result.Status, fmt.Errorf("quota HTTP %d", result.Status)
 	}
 	return []byte(result.Body), result.Status, nil
+}
+func (b *bridge) upstream(ctx context.Context, file authFile, endpoint string) ([]byte, int, error) {
+	data, _ := json.Marshal(map[string]string{"project": file.Project})
+	headers := map[string]string{"Authorization": "Bearer $TOKEN$", "Content-Type": "application/json", "User-Agent": "antigravity/cli/1.20.0 (pi-usage-cpa; os_type=linux; arch=x64)"}
+	return b.quotaCall(ctx, file, endpoint, "POST", headers, string(data))
 }
 func text(m map[string]json.RawMessage, keys ...string) string {
 	for _, key := range keys {
@@ -325,6 +335,9 @@ func (b *bridge) load(ctx context.Context) ([]account, error) {
 	}
 	accounts := []account{}
 	for _, file := range result.Files {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		provider := supportedProvider(file)
 		if provider == "" {
 			continue
@@ -376,6 +389,9 @@ func (b *bridge) load(ctx context.Context) ([]account, error) {
 			a.Missing = missing(a.Groups)
 		}
 		accounts = append(accounts, a)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return accounts, nil
 }

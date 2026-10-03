@@ -26,7 +26,7 @@ import (
 )
 
 // Release builds set this from the Git tag with -ldflags -X.
-var pluginVersion = "0.1.0-dev"
+var pluginVersion = "0.2.4-dev"
 var runtimeMu sync.Mutex
 var runtimeBridge *bridge
 

@@ -76,6 +76,25 @@ func TestSummaryDefaultGroupNames(t *testing.T) {
 	}
 }
 
+func TestCanceledRefreshDoesNotCachePartialAccounts(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v0/management/auth-files" {
+			fmt.Fprint(w, `{"files":[{"auth_index":"synthetic-claude","provider":"claude"}]}`)
+			return
+		}
+		cancel()
+		fmt.Fprint(w, `{"status_code":200,"body":"{\"five_hour\":{\"utilization\":20}}"}`)
+	}))
+	defer srv.Close()
+	b, _ := newBridge(srv.URL, "synthetic-admin", nil)
+	body, status := b.usage(ctx, false)
+	if status != 503 || b.cached != nil || strings.Contains(string(body), "synthetic") {
+		t.Fatalf("canceled refresh became a fresh partial cache: status=%d body=%s", status, body)
+	}
+}
+
 func TestService(t *testing.T) {
 	for _, upstreamStatus := range []int{200, 403, 429} {
 		t.Run(fmt.Sprint(upstreamStatus), func(t *testing.T) {

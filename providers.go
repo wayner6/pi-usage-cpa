@@ -34,25 +34,6 @@ func supportedProvider(file authFile) string {
 	return ""
 }
 
-// Only fixed, read-only quota endpoints are allowed. Never accept URLs, headers,
-// credentials, or auth indices from a downstream request.
-func (b *bridge) quotaCall(ctx context.Context, file authFile, endpoint string, method string, headers map[string]string, data string) ([]byte, error) {
-	payload := map[string]any{"authIndex": file.Index, "method": method, "url": endpoint, "header": headers}
-	if data != "" {
-		payload["data"] = data
-	}
-	var r struct {
-		Status int    `json:"status_code"`
-		Body   string `json:"body"`
-	}
-	if err := b.management(ctx, "api-call", payload, &r); err != nil {
-		return nil, err
-	}
-	if r.Status != 200 {
-		return nil, fmt.Errorf("quota HTTP %d", r.Status)
-	}
-	return []byte(r.Body), nil
-}
 func record(raw []byte) map[string]any { var m map[string]any; _ = json.Unmarshal(raw, &m); return m }
 func obj(v any) map[string]any         { m, _ := v.(map[string]any); return m }
 func array(v any) []any                { a, _ := v.([]any); return a }
@@ -351,8 +332,11 @@ func (b *bridge) providerQuota(ctx context.Context, file authFile, provider stri
 				}
 			}
 		}
-		u, _ := url.Parse(base)
-		if domain == "ai" || domain == "kimi.ai" || strings.Contains(file.Provider, "kimi-ai") || u.Hostname() == "kimi.ai" || strings.HasSuffix(u.Hostname(), ".kimi.ai") {
+		hostname := ""
+		if u, err := url.Parse(base); err == nil {
+			hostname = u.Hostname()
+		}
+		if domain == "ai" || domain == "kimi.ai" || strings.Contains(file.Provider, "kimi-ai") || hostname == "kimi.ai" || strings.HasSuffix(hostname, ".kimi.ai") {
 			endpoint = "https://api.kimi.ai/coding/v1/usages"
 		}
 		parse = parseKimi
@@ -379,16 +363,18 @@ func (b *bridge) providerQuota(ctx context.Context, file authFile, provider stri
 	default:
 		return nil, errors.New("unsupported provider")
 	}
-	raw, err := b.quotaCall(ctx, file, endpoint, method, headers, data)
+	raw, _, err := b.quotaCall(ctx, file, endpoint, method, headers, data)
+	plainBilling := false
 	if err != nil && provider == "xai" {
-		raw, err = b.quotaCall(ctx, file, "https://cli-chat-proxy.grok.com/v1/billing", "GET", headers, "")
+		plainBilling = true
+		raw, _, err = b.quotaCall(ctx, file, "https://cli-chat-proxy.grok.com/v1/billing", "GET", headers, "")
 	}
 	if err != nil {
 		return nil, err
 	}
 	g := parse(raw)
-	if provider == "xai" && !hasGroup(g, "monthly-billing") {
-		if monthly, err := b.quotaCall(ctx, file, "https://cli-chat-proxy.grok.com/v1/billing", "GET", headers, ""); err == nil {
+	if provider == "xai" && !plainBilling && !hasGroup(g, "monthly-billing") {
+		if monthly, _, err := b.quotaCall(ctx, file, "https://cli-chat-proxy.grok.com/v1/billing", "GET", headers, ""); err == nil {
 			for _, item := range parseXai(monthly) {
 				if item.ID == "monthly-billing" {
 					g = append(g, item)

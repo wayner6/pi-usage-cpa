@@ -195,6 +195,54 @@ func TestKimiDomainFromOwnCredential(t *testing.T) {
 	}
 }
 
+func TestKimiMalformedBaseURLDoesNotPanic(t *testing.T) {
+	for _, base := range []string{"%", "https://api.kimi.ai/%zz"} {
+		t.Run(base, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var req struct {
+					URL string `json:"url"`
+				}
+				if r.URL.Path != "/v0/management/api-call" || json.NewDecoder(r.Body).Decode(&req) != nil || req.URL != "https://api.kimi.com/coding/v1/usages" {
+					t.Error("malformed metadata changed the fixed endpoint")
+				}
+				fmt.Fprint(w, `{"status_code":200,"body":"{\"limits\":[{\"used\":1,\"limit\":2}]}"}`)
+			}))
+			defer srv.Close()
+			b, _ := newBridge(srv.URL, "synthetic-admin", nil)
+			value, _ := json.Marshal(base)
+			groups, err := b.providerQuota(context.Background(), authFile{Index: "synthetic-kimi", Metadata: map[string]json.RawMessage{"base_url": value}}, "kimi")
+			if err != nil || len(groups) != 1 || groups[0].Window != "" {
+				t.Fatalf("malformed URL caused a failure or guessed window: groups=%v err=%v", groups, err)
+			}
+		})
+	}
+}
+
+func TestXaiSuccessfulFallbackIsNotRepeated(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var req struct {
+			URL string `json:"url"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if strings.HasSuffix(req.URL, "?format=credits") {
+			fmt.Fprint(w, `{"status_code":403,"body":""}`)
+			return
+		}
+		if req.URL != "https://cli-chat-proxy.grok.com/v1/billing" {
+			t.Error("unexpected endpoint")
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"status_code": 200, "body": `{"config":{"creditUsagePercent":20,"currentPeriod":{"type":"weekly"}}}`})
+	}))
+	defer srv.Close()
+	b, _ := newBridge(srv.URL, "synthetic-admin", nil)
+	groups, err := b.providerQuota(context.Background(), authFile{Index: "synthetic-xai"}, "xai")
+	if err != nil || len(groups) != 1 || calls != 2 {
+		t.Fatalf("successful fallback repeated: calls=%d groups=%v err=%v", calls, groups, err)
+	}
+}
+
 func TestXaiBillingFailureNeverTriggersChat(t *testing.T) {
 	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

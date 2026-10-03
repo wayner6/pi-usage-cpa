@@ -1,6 +1,6 @@
 # 发布与维护说明（维护者）
 
-用户安装、验收和回滚请阅读 [README.md](README.md)。本文件面向维护者；发布资产以 GitHub Releases 为准，当前推荐服务端 v0.2.3 和客户端 GitHub 0.6.1。
+用户安装、验收和回滚请阅读 [README.md](README.md)。本文件面向维护者；发布资产以 GitHub Releases 为准，当前推荐服务端 v0.2.4 和客户端 GitHub 0.6.2。
 
 ## CPA v8 商店约定
 
@@ -22,7 +22,7 @@ ZIP 根目录只有 `pi-usage-cpa.so`，校验文件采用 sha256sum 格式；CP
 - CPA 插件进程必须有服务端可用的明文管理凭据。`PI_USAGE_CPA_MANAGEMENT_KEY` 优先；没有时复用已有 `MANAGEMENT_PASSWORD`。管理入口必须在容器进程的数字 loopback 上；普通 Pi API Key 无法代替管理密钥。只依赖配置中的 bcrypt 哈希时无法自动反推明文。
 - 宿主的请求日志可能与插件输出脱敏无关；确认管理请求及上游响应不被额外记录。
 - 在服务器本地核对真实 `groups[].displayName` 与 `buckets[].window`。组名不匹配时可用 `PI_USAGE_CPA_GROUP_MAP` 精确映射；该配置不能补出缺失的窗口，降级数据不得冒充 5h/7d。
-- 推荐 Pi Usage GitHub 0.6.1 配合服务端 v0.2.3：前者区分 GPT 与 GPT-OSS，后者包含注册和 Antigravity 组名映射修复。客户端不回退旧插件。
+- 推荐 Pi Usage GitHub 0.6.2 配合服务端 v0.2.4：前者区分 GPT 与 GPT-OSS，后者包含注册和 Antigravity 组名映射修复。客户端不回退旧插件。
 
 ## 手动构建（仅调试）
 
