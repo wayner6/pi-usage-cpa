@@ -107,7 +107,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' \
 
 ### 配套客户端
 
-使用 Pi Usage **GitHub 0.6.0**；npm latest `0.3.0` 不支持本插件。客户端安装见 [Pi Usage README](https://github.com/wayner6/pi-usage#安装)。
+使用 Pi Usage **GitHub 0.6.1**，正确区分 Codex 的 OpenAI GPT 与 Antigravity 的 GPT-OSS；多个匹配账户仍保留路由未知提示。npm latest `0.3.0` 不支持本插件。客户端安装见 [Pi Usage README](https://github.com/wayner6/pi-usage#安装)。
 
 ## 故障排查
 
